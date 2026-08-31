@@ -302,7 +302,9 @@ def run_bot():
     telegram_app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
+    # IMPORTANT: python-telegram-bot polling must run in the MAIN thread.
+    # Flask runs in the background so Render can health-check the service.
     db().close()
-    t = threading.Thread(target=run_bot, daemon=True)
-    t.start()
-    run_web()
+    web_thread = threading.Thread(target=run_web, daemon=True)
+    web_thread.start()
+    run_bot()
