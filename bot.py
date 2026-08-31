@@ -12,7 +12,7 @@ from telegram.ext import (
     ContextTypes, filters
 )
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8521216823:AAECoWyyGJdXghyQCPk36RxdAeP2PGh44PM").strip()
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8521216823:AAFmluVDV4IEqTL5E62vwSMXElntqOP9vMk").strip()
 ADMIN_ID_RAW = os.getenv("ADMIN_ID", "8423151783").strip()
 PUBLIC_URL = os.getenv("PUBLIC_URL", "https://bot1-py-9qyz.onrender.com").strip().rstrip("/")
 DB_PATH = os.getenv("DB_PATH", "./data/bot.db")
