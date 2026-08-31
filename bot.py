@@ -12,9 +12,9 @@ from telegram.ext import (
     ContextTypes, filters
 )
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8521216823:AAFmluVDV4IEqTL5E62vwSMXElntqOP9vMk").strip()
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8521216823:AAHeuGbO2d_gBGiJ_2BwsC_r_TP3OWTJ2t0").strip()
 ADMIN_ID_RAW = os.getenv("ADMIN_ID", "8423151783").strip()
-PUBLIC_URL = os.getenv("PUBLIC_URL", "https://bot1-py-9qyz.onrender.com").strip().rstrip("/")
+PUBLIC_URL = os.getenv("PUBLIC_URL", "").strip().rstrip("/")
 DB_PATH = os.getenv("DB_PATH", "./data/bot.db")
 
 if not BOT_TOKEN:
@@ -86,18 +86,17 @@ def all_numbers():
         return [r[0] for r in conn.execute("SELECT number FROM numbers ORDER BY id")]
 
 def add_numbers(text):
-    # Accept one-per-line, comma/space separated, and pasted mixed text.
-    candidates = re.findall(r"(?:\+|00)?\d[\d\s().-]{7,}\d", text)
-    if not candidates:
-        candidates = re.split(r"[\s,;]+", text)
-
+    # Parse numbers safely line-by-line so multiple pasted numbers
+    # are not accidentally merged into one long candidate.
     cleaned = []
     seen = set()
-    for item in candidates:
-        n = normalize_number(item)
-        if n and n not in seen:
-            seen.add(n)
-            cleaned.append(n)
+    for line in (text or "").splitlines():
+        # Allow comma/semicolon separated numbers on the same line.
+        for item in re.split(r"[,;\s]+", line.strip()):
+            n = normalize_number(item)
+            if n and n not in seen:
+                seen.add(n)
+                cleaned.append(n)
 
     added = 0
     with db() as conn:
