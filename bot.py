@@ -14,7 +14,7 @@ from telegram.ext import (
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8521216823:AAG9JCLn9UJkOQi3Q4Q7MR07dGnzyVYogxk").strip()
 ADMIN_ID_RAW = os.getenv("ADMIN_ID", "8423151783").strip()
-PUBLIC_URL = os.getenv("PUBLIC_URL", "").strip().rstrip("/")
+PUBLIC_URL = os.getenv("PUBLIC_URL", "https://bot1-py-9qyz.onrender.com").strip().rstrip("/")
 DB_PATH = os.getenv("DB_PATH", "./data/bot.db")
 
 if not BOT_TOKEN:
