@@ -117,7 +117,8 @@ def panel():
         [InlineKeyboardButton("➕ Add Numbers", callback_data="help_add"),
          InlineKeyboardButton("🔗 Get Single Link", callback_data="random")],
         [InlineKeyboardButton("📊 Number Count", callback_data="count"),
-         InlineKeyboardButton("🗑 Clear Numbers", callback_data="clear")],
+         InlineKeyboardButton("🔗 Set New Link", callback_data="setlink")],
+        [InlineKeyboardButton("🗑 Clear Numbers", callback_data="clear")],
     ])
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -141,10 +142,8 @@ async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def setlink_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update): return
-    await update.message.reply_text(
-        f"ℹ️ Single-link mode active hai.\n\nPermanent link:\n{PUBLIC_URL}",
-        disable_web_page_preview=True
-    )
+    await update.message.reply_text("🔗 Naya destination link bhejo.\nExample: https://example.com")
+    context.user_data["awaiting"] = "link"
 
 async def random_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update): return
@@ -188,8 +187,14 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=panel()
         )
     elif mode == "link":
+        link = (update.message.text or "").strip()
+        if not re.match(r"^https?://", link, re.I):
+            await update.message.reply_text("❌ Link http:// ya https:// se start hona chahiye.")
+            context.user_data["awaiting"] = "link"
+            return
+        set_setting("simple_link", link)
         await update.message.reply_text(
-            f"ℹ️ Single-link mode active hai.\n\nPermanent link:\n{PUBLIC_URL}",
+            f"✅ New link set!\n\nSingle permanent URL:\n{PUBLIC_URL}",
             reply_markup=panel(),
             disable_web_page_preview=True
         )
@@ -213,10 +218,10 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not nums:
             await q.message.reply_text("⚠️ No numbers saved. /add use karo.")
         else:
-            await q.message.reply_text(f"🎲 {PUBLIC_URL}/random", disable_web_page_preview=True)
+            await q.message.reply_text(f"🔗 Single permanent link:\n{PUBLIC_URL}", disable_web_page_preview=True)
     elif data == "simple":
         await q.message.reply_text(
-            f"🔗 Single link:\n{PUBLIC_URL}",
+            f"🔗 Single permanent link:\n{PUBLIC_URL}",
             disable_web_page_preview=True
         )
     elif data == "count":
@@ -227,21 +232,24 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conn.commit()
         await q.message.reply_text("🗑 Numbers cleared.")
     elif data == "setlink":
-        await q.message.reply_text(
-            f"ℹ️ Single-link mode active hai.\n\nPermanent link:\n{PUBLIC_URL}",
-            disable_web_page_preview=True
-        )
+        context.user_data["awaiting"] = "link"
+        await q.message.reply_text("🔗 Naya destination link bhejo.\nExample: https://example.com")
 
 
 app_web = Flask(__name__)
 
 @app_web.get("/")
 def home():
+    # One permanent URL. If a custom link is set, open it; otherwise
+    # fall back to a random saved WhatsApp number.
+    custom_link = get_setting("simple_link")
+    if custom_link:
+        return redirect(custom_link, code=302)
+
     nums = all_numbers()
     if not nums:
         return Response("No numbers available.", status=404, mimetype="text/plain")
 
-    # Same URL, random WhatsApp number on every visit.
     selected = random.choice(nums)
     return redirect(wa_url(selected), code=302)
 
