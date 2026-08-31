@@ -12,9 +12,9 @@ from telegram.ext import (
     ContextTypes, filters
 )
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8521216823:AAFUg5Jg3uuaMuVREg076ZHCZhD_tAaGPGg").strip()
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8521216823:AAG9JCLn9UJkOQi3Q4Q7MR07dGnzyVYogxk").strip()
 ADMIN_ID_RAW = os.getenv("ADMIN_ID", "8423151783").strip()
-PUBLIC_URL = os.getenv("PUBLIC_URL", "https://bot1-py-9qyz.onrender.com").strip().rstrip("/")
+PUBLIC_URL = os.getenv("PUBLIC_URL", "").strip().rstrip("/")
 DB_PATH = os.getenv("DB_PATH", "./data/bot.db")
 
 if not BOT_TOKEN:
@@ -115,11 +115,9 @@ def wa_url(number):
 def panel():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("➕ Add Numbers", callback_data="help_add"),
-         InlineKeyboardButton("🎲 Random Page", callback_data="random")],
-        [InlineKeyboardButton("🔗 Simple Page", callback_data="simple"),
-         InlineKeyboardButton("📊 Number Count", callback_data="count")],
-        [InlineKeyboardButton("🗑 Clear Numbers", callback_data="clear"),
-         InlineKeyboardButton("⚙️ Set Link", callback_data="setlink")],
+         InlineKeyboardButton("🔗 Get Single Link", callback_data="random")],
+        [InlineKeyboardButton("📊 Number Count", callback_data="count"),
+         InlineKeyboardButton("🗑 Clear Numbers", callback_data="clear")],
     ])
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -143,8 +141,10 @@ async def add_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def setlink_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update): return
-    await update.message.reply_text("🔗 Naya redirect link bhejo.\nExample: https://example.com")
-    context.user_data["awaiting"] = "link"
+    await update.message.reply_text(
+        f"ℹ️ Single-link mode active hai.\n\nPermanent link:\n{PUBLIC_URL}",
+        disable_web_page_preview=True
+    )
 
 async def random_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update): return
@@ -153,18 +153,7 @@ async def random_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Pehle /add se numbers add karo.")
         return
     await update.message.reply_text(
-        f"🎲 Random WhatsApp page ready:\n{PUBLIC_URL}/random",
-        disable_web_page_preview=True
-    )
-
-async def simple_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update): return
-    link = get_setting("simple_link")
-    if not link:
-        await update.message.reply_text("⚠️ Pehle /setlink se link set karo.")
-        return
-    await update.message.reply_text(
-        f"🔗 Simple redirect page:\n{PUBLIC_URL}/simple",
+        f"🔗 Single permanent link:\n{PUBLIC_URL}",
         disable_web_page_preview=True
     )
 
@@ -199,13 +188,8 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=panel()
         )
     elif mode == "link":
-        link = (update.message.text or "").strip()
-        if not re.match(r"^https?://", link, re.I):
-            await update.message.reply_text("❌ Link http:// ya https:// se start hona chahiye.")
-            return
-        set_setting("simple_link", link)
         await update.message.reply_text(
-            f"✅ Link updated.\n\nSimple page:\n{PUBLIC_URL}/simple",
+            f"ℹ️ Single-link mode active hai.\n\nPermanent link:\n{PUBLIC_URL}",
             reply_markup=panel(),
             disable_web_page_preview=True
         )
@@ -231,10 +215,10 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await q.message.reply_text(f"🎲 {PUBLIC_URL}/random", disable_web_page_preview=True)
     elif data == "simple":
-        if not get_setting("simple_link"):
-            await q.message.reply_text("⚠️ /setlink se link set karo.")
-        else:
-            await q.message.reply_text(f"🔗 {PUBLIC_URL}/simple", disable_web_page_preview=True)
+        await q.message.reply_text(
+            f"🔗 Single link:\n{PUBLIC_URL}",
+            disable_web_page_preview=True
+        )
     elif data == "count":
         await q.message.reply_text(f"📊 Saved numbers: {len(all_numbers())}")
     elif data == "clear":
@@ -243,45 +227,23 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conn.commit()
         await q.message.reply_text("🗑 Numbers cleared.")
     elif data == "setlink":
-        context.user_data["awaiting"] = "link"
-        await q.message.reply_text("🔗 Ab naya redirect link bhejo.")
+        await q.message.reply_text(
+            f"ℹ️ Single-link mode active hai.\n\nPermanent link:\n{PUBLIC_URL}",
+            disable_web_page_preview=True
+        )
+
 
 app_web = Flask(__name__)
 
 @app_web.get("/")
 def home():
-    return "Bot is running."
-
-@app_web.get("/random")
-def random_page():
     nums = all_numbers()
     if not nums:
         return Response("No numbers available.", status=404, mimetype="text/plain")
-    # Browser chooses a random saved number on each visit.
-    js_nums = "[" + ",".join(repr(wa_url(n)) for n in nums) + "]"
-    html = f"""<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WhatsApp Redirect</title>
-<script>
-const numbers = {js_nums};
-const selected = numbers[Math.floor(Math.random() * numbers.length)];
-window.location.replace(selected);
-</script>
-</head>
-<body>Redirecting to WhatsApp…</body>
-</html>"""
-    return Response(html, mimetype="text/html")
 
-@app_web.get("/simple")
-def simple_page():
-    link = get_setting("simple_link")
-    if not link:
-        return Response("Redirect link is not set.", status=404, mimetype="text/plain")
-    # Server-side redirect, equivalent to a simple redirect page.
-    return redirect(link, code=302)
+    # Same URL, random WhatsApp number on every visit.
+    selected = random.choice(nums)
+    return redirect(wa_url(selected), code=302)
 
 def run_web():
     port = int(os.getenv("PORT", "10000"))
@@ -293,7 +255,6 @@ def run_bot():
     telegram_app.add_handler(CommandHandler("add", add_cmd))
     telegram_app.add_handler(CommandHandler("setlink", setlink_cmd))
     telegram_app.add_handler(CommandHandler("random", random_cmd))
-    telegram_app.add_handler(CommandHandler("simple", simple_cmd))
     telegram_app.add_handler(CommandHandler("numbers", numbers_cmd))
     telegram_app.add_handler(CommandHandler("clear", clear_cmd))
     telegram_app.add_handler(CallbackQueryHandler(callbacks))
