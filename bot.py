@@ -3,6 +3,8 @@ import re
 import sqlite3
 import threading
 import random
+import time
+import urllib.request
 from urllib.parse import quote
 
 from flask import Flask, redirect, Response
@@ -12,10 +14,10 @@ from telegram.ext import (
     ContextTypes, filters
 )
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8521216823:AAGKLJ3R9gPsqrSOxnbE0WSFgiN3ql49WlA").strip()
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8521216823:AAGE4CbdnfBfidZtepbUuO2mSv1KCMc-UyA").strip()
 ADMIN_ID_RAW = os.getenv("ADMIN_ID", "8423151783").strip()
 PUBLIC_URL = os.getenv("PUBLIC_URL", "https://bot1-py-9qyz.onrender.com").strip().rstrip("/")
-DB_PATH = os.getenv("DB_PATH", "./data/bot.db")
+DB_PATH = os.getenv("DB_PATH", "/var/data/bot.db")
 
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN environment variable is missing.")
@@ -238,10 +240,15 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 app_web = Flask(__name__)
 
+@app_web.get("/health")
+def health():
+    return Response("OK", status=200, mimetype="text/plain")
+
 @app_web.get("/")
 def home():
-    # One permanent URL. If a custom link is set, open it; otherwise
-    # fall back to a random saved WhatsApp number.
+    # One permanent public URL.
+    # If a custom destination link is set, redirect there.
+    # Otherwise, choose a random saved WhatsApp number.
     custom_link = get_setting("simple_link")
     if custom_link:
         return redirect(custom_link, code=302)
@@ -252,6 +259,22 @@ def home():
 
     selected = random.choice(nums)
     return redirect(wa_url(selected), code=302)
+
+def auto_ping():
+    # Keep the Render service receiving traffic periodically.
+    # This is a keep-alive helper, not a guarantee against Render plan limits.
+    ping_url = PUBLIC_URL + "/health"
+    while True:
+        try:
+            req = urllib.request.Request(
+                ping_url,
+                headers={"User-Agent": "Render-KeepAlive/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=15) as response:
+                response.read(64)
+        except Exception:
+            pass
+        time.sleep(10 * 60)
 
 def run_web():
     port = int(os.getenv("PORT", "10000"))
@@ -275,4 +298,8 @@ if __name__ == "__main__":
     db().close()
     web_thread = threading.Thread(target=run_web, daemon=True)
     web_thread.start()
+
+    ping_thread = threading.Thread(target=auto_ping, daemon=True)
+    ping_thread.start()
+
     run_bot()
